@@ -3,8 +3,6 @@ import { Board } from "../types/board";
 import { motion } from "framer-motion";
 import PiecePreview from "./PiecePreview";
 
-const CELL_SIZE = 32;
-
 interface GameBoardProps {
   grid: Board;
   previewPiece?: {
@@ -18,6 +16,7 @@ interface GameBoardProps {
   draggedPiece?: any;
   dragOffset?: { x: number, y: number } | null;
   boardRef: React.RefObject<HTMLDivElement>;
+  cellSize?: number;
 }
 
 const GameBoard: React.FC<GameBoardProps> = ({
@@ -27,70 +26,101 @@ const GameBoard: React.FC<GameBoardProps> = ({
                                                draggedPiece,
                                                dragOffset,
                                                boardRef,
+                                               cellSize = 32,
                                              }) => {
   return (
     <div
       ref={boardRef}
       style={{
-        display: "inline-block",
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
         position: "relative",
-        background: "#f9f9f9",
-        padding: 8,
-        borderRadius: 10,
-        boxShadow: "0 2px 12px rgba(0,0,0,0.07)",
-        marginBottom: 24,
-        userSelect: "none",
-        touchAction: "none",
+        background: "transparent",
+        borderRadius: 14,
+        margin: "0 auto",
+        width: grid[0].length * cellSize,
+        height: grid.length * cellSize,
+        minWidth: grid[0].length * cellSize,
+        minHeight: grid.length * cellSize,
+        maxWidth: grid[0].length * cellSize,
+        maxHeight: grid.length * cellSize,
+        boxSizing: "content-box",
+        overflow: "visible",
+        padding: 0,
+        boxShadow: "none", // No extra shadow here!
       }}
     >
       <div
         style={{
           display: "grid",
-          gridTemplateRows: `repeat(${grid.length}, ${CELL_SIZE}px)`,
-          gridTemplateColumns: `repeat(${grid[0].length}, ${CELL_SIZE}px)`,
-          gap: 2,
-          userSelect: "none",
-          touchAction: "none",
+          gridTemplateRows: `repeat(${grid.length}, ${cellSize}px)`,
+          gridTemplateColumns: `repeat(${grid[0].length}, ${cellSize}px)`,
+          gap: 1.5,
+          width: "100%",
+          height: "100%",
         }}
       >
         {grid.map((rowArr, rowIdx) =>
-          rowArr.map((cell, colIdx) => (
-            <div
-              key={`${rowIdx}-${colIdx}`}
-              style={{
-                width: CELL_SIZE,
-                height: CELL_SIZE,
-                border: "1px solid #bbb",
-                background: cell ? "#4b4b4b" : "#fff",
-                position: "relative",
-                userSelect: "none",
-                touchAction: "none",
-              }}
-            >
-              {/* Preview highlight */}
-              {previewPiece &&
-                isPieceCell(previewPiece.matrix, rowIdx, colIdx, previewPiece.row, previewPiece.col) && (
+          rowArr.map((cell, colIdx) => {
+            let previewIsHere = false;
+            let isFilled = false;
+            let isGreen = false;
+            if (previewPiece) {
+              const relR = rowIdx - previewPiece.row;
+              const relC = colIdx - previewPiece.col;
+              if (
+                relR >= 0 &&
+                relC >= 0 &&
+                relR < previewPiece.matrix.length &&
+                relC < previewPiece.matrix[0].length
+              ) {
+                if (previewPiece.matrix[relR][relC]) {
+                  previewIsHere = true;
+                  isFilled = true;
+                  isGreen = previewPiece.canPlace;
+                }
+              }
+            }
+            return (
+              <div
+                key={`${rowIdx}-${colIdx}`}
+                style={{
+                  width: cellSize,
+                  height: cellSize,
+                  border: "1.3px solid #b2adad",
+                  background: cell
+                    ? "#1d3649"
+                    : "#f8f8ef",
+                  position: "relative",
+                  borderRadius: 4,
+                  overflow: "hidden",
+                  transition: "background 0.18s, border 0.16s",
+                }}
+              >
+                {/* Board overlay for drag preview */}
+                {previewIsHere && isFilled && (
                   <motion.div
                     style={{
                       position: "absolute",
                       top: 0, left: 0, width: "100%", height: "100%",
-                      background: previewPiece.canPlace
-                        ? "rgba(80,200,120,0.43)"
-                        : "rgba(200,50,50,0.35)",
+                      background: isGreen
+                        ? "rgba(90,200,120,0.27)"
+                        : "rgba(230,60,60,0.24)",
                       pointerEvents: "none",
-                      borderRadius: 5,
-                      userSelect: "none",
-                      touchAction: "none",
+                      borderRadius: 4,
+                      zIndex: 2,
                     }}
-                    initial={{ scale: 0.85 }}
-                    animate={{ scale: 1 }}
+                    initial={{ scale: 0.8, opacity: 0.5 }}
+                    animate={{ scale: 1, opacity: 1 }}
                   />
                 )}
-            </div>
-          ))
+              </div>
+            );
+          })
         )}
       </div>
-      {/* Floating piece preview (follows cursor/finger) */}
+      {/* Drag preview piece */}
       {draggingPiece && dragOffset && draggedPiece && previewPiece && (
         <motion.div
           style={{
@@ -100,28 +130,22 @@ const GameBoard: React.FC<GameBoardProps> = ({
             top:
               dragOffset.y -
               (boardRef.current?.getBoundingClientRect().top ?? 0) -
-              ((draggedPiece.matrix.length * CELL_SIZE) / 2 + (window.innerWidth < 600 ? 32 : 0)),
+              ((draggedPiece.matrix.length * cellSize) / 2 + (window.innerWidth < 600 ? 32 : 0)),
             left:
               dragOffset.x -
               (boardRef.current?.getBoundingClientRect().left ?? 0) -
-              (draggedPiece.matrix[0].length * CELL_SIZE) / 2,
-            opacity: 0.6,
-            scale: 1.08
+              (draggedPiece.matrix[0].length * cellSize) / 2,
+            opacity: 0.7,
+            scale: 1.04
           }}
-          initial={{ scale: 0.95, opacity: 0.4 }}
-          animate={{ scale: 1.08, opacity: 0.8 }}
+          initial={{ scale: 0.97, opacity: 0.45 }}
+          animate={{ scale: 1.04, opacity: 0.85 }}
         >
-          <PiecePreview piece={draggedPiece} size={CELL_SIZE} />
+          <PiecePreview piece={draggedPiece} size={cellSize} />
         </motion.div>
       )}
     </div>
   );
 };
-
-function isPieceCell(matrix: number[][], row: number, col: number, baseRow: number, baseCol: number) {
-  const localR = row - baseRow;
-  const localC = col - baseCol;
-  return matrix[localR] && matrix[localR][localC];
-}
 
 export default GameBoard;

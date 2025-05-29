@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import {
   Typography, Box, Paper, Stack, Avatar, Dialog, DialogTitle,
-  DialogContent, Button, Slide, Snackbar, Alert, CircularProgress
+  DialogContent, Button, Slide, Snackbar, Alert, useTheme
 } from "@mui/material";
 import LinearProgress from "@mui/material/LinearProgress";
 import { getInitData, getTelegramUser } from "../utils/telegram";
@@ -38,28 +38,7 @@ interface GameState {
   notification?: string | null;
 }
 
-const CELL_SIZE = 32;
-
-function canPlacePiece(board: Board, piece: PlayerPiece, row: number, col: number): boolean {
-  for (let r = 0; r < piece.matrix.length; r++) {
-    for (let c = 0; c < piece.matrix[r].length; c++) {
-      if (piece.matrix[r][c]) {
-        const boardRow = row + r;
-        const boardCol = col + c;
-        if (
-          boardRow < 0 ||
-          boardCol < 0 ||
-          boardRow >= board.length ||
-          boardCol >= board[0].length ||
-          board[boardRow][boardCol]
-        ) {
-          return false;
-        }
-      }
-    }
-  }
-  return true;
-}
+const BOARD_MAX_PX = 310;
 
 const ResultModal: React.FC<{
   open: boolean;
@@ -82,11 +61,32 @@ const ResultModal: React.FC<{
   </Dialog>
 );
 
+function canPlacePiece(board: Board, piece: PlayerPiece, row: number, col: number): boolean {
+  for (let r = 0; r < piece.matrix.length; r++) {
+    for (let c = 0; c < piece.matrix[r].length; c++) {
+      if (piece.matrix[r][c]) {
+        const boardRow = row + r;
+        const boardCol = col + c;
+        if (
+          boardRow < 0 ||
+          boardCol < 0 ||
+          boardRow >= board.length ||
+          boardCol >= board[0].length ||
+          board[boardRow][boardCol]
+        ) {
+          return false;
+        }
+      }
+    }
+  }
+  return true;
+}
+
 const GameScreen: React.FC<{
   gameId: string;
   onReturnToMenu: () => void;
 }> = ({ gameId, onReturnToMenu }) => {
-  // --- STATE ---
+  const theme = useTheme();
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [playerIdx, setPlayerIdx] = useState<0 | 1 | null>(null);
   const [showModal, setShowModal] = useState(false);
@@ -100,7 +100,7 @@ const GameScreen: React.FC<{
 
   const boardRef = useRef<HTMLDivElement>(null);
 
-  // ---- Fix: Use refs to access latest drag state in event handlers
+  // Fix: Use refs to access latest drag state in event handlers
   const draggedPieceIdxRef = useRef<number | null>(null);
   const dragOffsetRef = useRef<{ x: number, y: number } | null>(null);
 
@@ -143,13 +143,10 @@ const GameScreen: React.FC<{
   };
 
   // --- DRAG LOGIC ---
-  // Start drag
   const handlePieceDragStart = (idx: number, e: React.PointerEvent | React.TouchEvent) => {
     e.preventDefault();
     setDraggedPieceIdx(idx);
     draggedPieceIdxRef.current = idx;
-
-    // Get pointer coordinates
     let x = 0, y = 0;
     if ("touches" in e && e.touches.length) {
       x = e.touches[0].clientX;
@@ -161,7 +158,6 @@ const GameScreen: React.FC<{
     setDragOffset({ x, y });
     dragOffsetRef.current = { x, y };
 
-    // Start listening for pointer moves globally
     const moveHandler = (ev: any) => {
       if (ev.touches && ev.touches.length) {
         const next = { x: ev.touches[0].clientX, y: ev.touches[0].clientY };
@@ -189,13 +185,13 @@ const GameScreen: React.FC<{
         const piece = gameState.players[playerIdx].pieces[draggedIdx];
         const pieceRows = piece.matrix.length;
         const pieceCols = piece.matrix[0].length;
-        const centerOffsetX = (pieceCols * CELL_SIZE) / 2;
-        const centerOffsetY = (pieceRows * CELL_SIZE) / 2 + (window.innerWidth < 600 ? 32 : 0);
+        const centerOffsetX = (pieceCols * boardCellPx) / 2;
+        const centerOffsetY = (pieceRows * boardCellPx) / 2 + (window.innerWidth < 600 ? 32 : 0);
 
         const x = offset.x - rect.left - centerOffsetX;
         const y = offset.y - rect.top - centerOffsetY;
-        const row = Math.round(y / CELL_SIZE);
-        const col = Math.round(x / CELL_SIZE);
+        const row = Math.round(y / boardCellPx);
+        const col = Math.round(x / boardCellPx);
 
         const valid =
           row >= 0 &&
@@ -254,8 +250,18 @@ const GameScreen: React.FC<{
     window.addEventListener("touchend", endHandler, { passive: false });
   };
 
+  // Responsive, fixed board cell size & fixed board container!
+  let boardCellPx = 32; // fallback
+  let boardPx = BOARD_MAX_PX;
+  if (gameState) {
+    const boardLen = Math.max(gameState.board.length, gameState.board[0].length);
+    boardPx = Math.min(window.innerWidth - 24, BOARD_MAX_PX, window.innerHeight * 0.41);
+    boardCellPx = Math.floor(boardPx / boardLen);
+    boardPx = boardCellPx * boardLen; // perfect square
+  }
+
   // --- PREVIEW & DROP ---
-  let stickyCell = null, canPlace = false, previewPiece = undefined;
+  let previewPiece = undefined;
   if (
     draggedPieceIdx !== null &&
     dragOffset &&
@@ -265,16 +271,15 @@ const GameScreen: React.FC<{
   ) {
     const rect = boardRef.current.getBoundingClientRect();
     const piece = gameState.players[playerIdx].pieces[draggedPieceIdx];
-    // Centering offset
     const pieceRows = piece.matrix.length;
     const pieceCols = piece.matrix[0].length;
-    const centerOffsetX = (pieceCols * CELL_SIZE) / 2;
-    const centerOffsetY = (pieceRows * CELL_SIZE) / 2 + (window.innerWidth < 600 ? 32 : 0);
+    const centerOffsetX = (pieceCols * boardCellPx) / 2;
+    const centerOffsetY = (pieceRows * boardCellPx) / 2 + (window.innerWidth < 600 ? 32 : 0);
 
     const x = dragOffset.x - rect.left - centerOffsetX;
     const y = dragOffset.y - rect.top - centerOffsetY;
-    const row = Math.round(y / CELL_SIZE);
-    const col = Math.round(x / CELL_SIZE);
+    const row = Math.round(y / boardCellPx);
+    const col = Math.round(x / boardCellPx);
 
     if (
       row >= 0 &&
@@ -282,15 +287,12 @@ const GameScreen: React.FC<{
       row + pieceRows <= gameState.board.length &&
       col + pieceCols <= gameState.board[0].length
     ) {
-      stickyCell = { row, col };
-      canPlace = canPlacePiece(gameState.board, piece, row, col);
       previewPiece = {
         matrix: piece.matrix,
         row, col, color: piece.color,
-        canPlace
+        canPlace: canPlacePiece(gameState.board, piece, row, col)
       };
     } else if (row >= 0 && col >= 0) {
-      stickyCell = { row, col };
       previewPiece = {
         matrix: piece.matrix,
         row, col, color: piece.color,
@@ -299,7 +301,6 @@ const GameScreen: React.FC<{
     }
   }
 
-  // Reset drag on board update (after placing)
   useEffect(() => {
     if (!draggedPieceIdx && lastDragPos && !animatingReturn) setLastDragPos(null);
   }, [draggedPieceIdx, lastDragPos, animatingReturn]);
@@ -333,43 +334,110 @@ const GameScreen: React.FC<{
           {notification}
         </Alert>
       </Snackbar>
-      <Box p={2} minHeight="100vh" bgcolor="background.default">
-        <Paper elevation={3} sx={{maxWidth: 480, mx: "auto", p: 3, borderRadius: 4, position: "relative"}}>
-          <Stack direction="row" spacing={3} alignItems="center" justifyContent="space-between" mb={2}>
-            <Avatar src={myPlayer.photo_url} sx={{width: 44, height: 44, border: '2px solid #E09F3E'}}>
-              {(!myPlayer.photo_url && myPlayer.first_name) ? myPlayer.first_name[0] : null}
-            </Avatar>
-            <Typography fontWeight={700} color="primary">VS</Typography>
-            <Avatar src={opponent?.photo_url} sx={{width: 44, height: 44}}>
-              {(!opponent?.photo_url && opponent?.first_name) ? opponent.first_name[0] : null}
-            </Avatar>
+      <Box
+        sx={{
+          p: { xs: 1, md: 2 },
+          minHeight: "100dvh",
+          bgcolor: theme.palette.background.default,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          overflow: "hidden",
+        }}
+      >
+        <Paper elevation={4} sx={{
+          width: "100%",
+          maxWidth: 380,
+          mx: "auto",
+          p: { xs: 1, md: 2 },
+          borderRadius: 3,
+          position: "relative",
+          bgcolor: theme.palette.background.paper,
+          mt: { xs: 0.5, md: 2 },
+          boxShadow: "0 4px 32px 0 rgba(0,0,0,0.08)",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center"
+        }}>
+          {/* MINIMAL TOP FEED */}
+          <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 0.5, width: "100%" }}>
+            <Box sx={{ textAlign: "center", flex: 1 }}>
+              <Avatar src={myPlayer.photo_url} sx={{ width: 36, height: 36, mx: "auto", border: `2px solid ${theme.palette.primary.light}` }}>
+                {(!myPlayer.photo_url && myPlayer.first_name) ? myPlayer.first_name[0] : null}
+              </Avatar>
+              <Typography fontSize={12} sx={{ mt: 0.3 }}>{myPlayer.first_name ?? "You"}</Typography>
+            </Box>
+            <Box sx={{ flex: 2, display: "flex", flexDirection: "column", alignItems: "center", minWidth: 0 }}>
+              <Stack direction="row" spacing={0.5} width="100%" alignItems="center" sx={{ mb: 0.4, mt: 0 }}>
+                <LinearProgress variant="determinate" value={myPlayer.hp} sx={{
+                  width: "48%",
+                  height: 14,
+                  borderRadius: 8,
+                  bgcolor: theme.palette.grey[200],
+                  "& .MuiLinearProgress-bar": { bgcolor: theme.palette.success.main }
+                }} />
+                <LinearProgress variant="determinate" value={opponent?.hp ?? 0} sx={{
+                  width: "48%",
+                  height: 14,
+                  borderRadius: 8,
+                  bgcolor: theme.palette.grey[200],
+                  "& .MuiLinearProgress-bar": { bgcolor: theme.palette.error.main }
+                }} />
+              </Stack>
+              <Typography
+                variant="caption"
+                color={isMyTurn ? "success.main" : "text.secondary"}
+                fontWeight={600}
+                sx={{ textAlign: "center", fontSize: 13, minHeight: 18 }}>
+                {gameState?.gameOver ? "" : isMyTurn ? "Your Turn" : "Opponent"}
+              </Typography>
+            </Box>
+            <Box sx={{ textAlign: "center", flex: 1 }}>
+              <Avatar src={opponent?.photo_url} sx={{ width: 36, height: 36, mx: "auto" }}>
+                {(!opponent?.photo_url && opponent?.first_name) ? opponent.first_name[0] : null}
+              </Avatar>
+              <Typography fontSize={12} sx={{ mt: 0.3 }}>{opponent?.first_name ?? "Opponent"}</Typography>
+            </Box>
           </Stack>
-          {!gameState?.gameOver && (
-            <Typography align="center" fontWeight={600} color={isMyTurn ? "success.main" : "text.secondary"} mb={2}>
-              {isMyTurn ? "Your Turn" : "Waiting for Opponent..."}
-            </Typography>
-          )}
-          <Stack spacing={1} sx={{mb: 3}}>
-            <Typography variant="subtitle2" color="primary">Your HP</Typography>
-            <LinearProgress variant="determinate" value={myPlayer.hp} sx={{height: 10, borderRadius: 5}}/>
-            <Typography variant="subtitle2" color="error">Opponent HP</Typography>
-            <LinearProgress variant="determinate" value={opponent?.hp ?? 0} sx={{height: 10, borderRadius: 5}}
-                            color="error"/>
-          </Stack>
-          <Typography variant="h5" gutterBottom align="center">
-            Board
-          </Typography>
-          <div ref={boardRef}>
-            <GameBoard
-              grid={gameState?.board ?? []}
-              previewPiece={previewPiece}
-              draggingPiece={draggedPieceIdx !== null}
-              draggedPiece={draggedPieceIdx !== null ? myPlayer.pieces[draggedPieceIdx] : undefined}
-              dragOffset={dragOffset}
-              boardRef={boardRef}
-            />
-          </div>
-          <Typography variant="h6" sx={{mt: 3, mb: 1}} align="center">
+
+          {/* BOARD (centered, fixed size, margin below) */}
+          <Box sx={{
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            mt: 0.5,
+            mb: 1.2,
+            width: "100%",
+            minHeight: boardPx, // keep space reserved!
+          }}>
+            <div ref={boardRef} style={{
+              width: boardPx,
+              height: boardPx,
+              minWidth: boardPx,
+              minHeight: boardPx,
+              maxWidth: boardPx,
+              maxHeight: boardPx,
+              boxSizing: "border-box",
+              overflow: "visible",
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              margin: "0 auto"
+            }}>
+              <GameBoard
+                grid={gameState?.board ?? []}
+                previewPiece={previewPiece}
+                draggingPiece={draggedPieceIdx !== null}
+                draggedPiece={draggedPieceIdx !== null ? myPlayer.pieces[draggedPieceIdx] : undefined}
+                dragOffset={dragOffset}
+                boardRef={boardRef}
+                cellSize={boardCellPx}
+                theme={theme}
+              />
+            </div>
+          </Box>
+
+          <Typography variant="h6" sx={{ mt: 0.5, mb: 0.5, textAlign: "center", width: "100%" }}>
             Choose a Piece
           </Typography>
           <PiecePocket
