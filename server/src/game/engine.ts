@@ -1,24 +1,39 @@
+// engine.js
+import { PIECES } from "./pieces.js";
+import { Board, Piece, PlayerPiece } from "../types.js";
 
-// Randomly pick N different pieces from PIECES
-
-
-import {Board, Piece} from "../types.js";
-import {PIECES} from "./pieces.js";
-
-export function getRandomPieces(n: number): Piece[] {
-  const shuffled = [...PIECES].sort(() => Math.random() - 0.5);
-  return shuffled.slice(0, n);
+// Randomly pick N different pieces, ONE random rotation per piece
+export function getRandomPieces(n: number) {
+  const pieces = [];
+  const pool = [...PIECES];
+  for (let i = 0; i < n; i++) {
+    const base = pool[Math.floor(Math.random() * pool.length)];
+    const randomIdx = Math.floor(Math.random() * base.matrices.length);
+    const matrix = base.matrices[randomIdx].map(row => [...row]);
+    pieces.push({
+      id: base.id,
+      name: base.name,
+      color: base.color,
+      matrix,
+    });
+  }
+  return pieces;
 }
 
-export function canPlacePiece(board: Board, piece: Piece, rotation: number, row: number, col: number): boolean {
-  const matrix = piece.matrices[rotation % piece.matrices.length];
+/**
+ * Returns true if piece can be placed at position (row, col)
+ * @param {Board} board
+ * @param {PlayerPiece} piece
+ * @param {number} row
+ * @param {number} col
+ */
+export function canPlacePiece(board: Board, piece: PlayerPiece, row: number, col: number) {
+  const matrix = piece.matrix;
   for (let r = 0; r < matrix.length; r++) {
     for (let c = 0; c < matrix[0].length; c++) {
       if (matrix[r][c]) {
-        // Check board bounds
         if (row + r >= board.length || col + c >= board[0].length) return false;
         if (row + r < 0 || col + c < 0) return false;
-        // Can't place over filled cell
         if (board[row + r][col + c] !== 0) return false;
       }
     }
@@ -26,8 +41,16 @@ export function canPlacePiece(board: Board, piece: Piece, rotation: number, row:
   return true;
 }
 
-export function placePiece(board: Board, piece: Piece, rotation: number, row: number, col: number): Board {
-  const matrix = piece.matrices[rotation % piece.matrices.length];
+/**
+ * Place the piece, return new board
+ * @param {Board} board
+ * @param {PlayerPiece} piece
+ * @param {number} row
+ * @param {number} col
+ * @returns {Board}
+ */
+export function placePiece(board: Board, piece: PlayerPiece, row: number, col: number) {
+  const matrix = piece.matrix;
   const newBoard = board.map(row => [...row]);
   for (let r = 0; r < matrix.length; r++) {
     for (let c = 0; c < matrix[0].length; c++) {
@@ -39,50 +62,54 @@ export function placePiece(board: Board, piece: Piece, rotation: number, row: nu
   return newBoard;
 }
 
-export function hasAnyValidMove(board: Board, pieces: Piece[]): boolean {
+/**
+ * Returns true if ANY piece can be placed somewhere
+ * @param {Board} board
+ * @param {PlayerPiece[]} pieces
+ */
+export function hasAnyValidMove(board: Board, pieces: PlayerPiece[]) {
+  const rows = board.length;
+  const cols = board[0].length;
+
   for (let p = 0; p < pieces.length; p++) {
     const piece = pieces[p];
-    for (let rot = 0; rot < piece.matrices.length; rot++) {
-      const matrix = piece.matrices[rot];
-      const rows = board.length;
-      const cols = board[0].length;
-      const mr = matrix.length;
-      const mc = matrix[0].length;
-
-      // Try to center on every cell and check for placement
-      for (let row = 0; row < rows; row++) {
-        for (let col = 0; col < cols; col++) {
-          const anchorRow = row - Math.floor(mr / 2);
-          const anchorCol = col - Math.floor(mc / 2);
-          if (
-            anchorRow >= 0 &&
-            anchorCol >= 0 &&
-            anchorRow + mr <= rows &&
-            anchorCol + mc <= cols &&
-            canPlacePiece(board, piece, rot, anchorRow, anchorCol)
-          ) {
-            return true; // At least one move found!
+    const mr = piece.matrix.length;
+    const mc = piece.matrix[0].length;
+    for (let row = 0; row <= rows - mr; row++) {
+      for (let col = 0; col <= cols - mc; col++) {
+        let canPlace = true;
+        for (let r = 0; r < mr; r++) {
+          for (let c = 0; c < mc; c++) {
+            if (piece.matrix[r][c]) {
+              if (board[row + r][col + c] !== 0) {
+                canPlace = false;
+                break;
+              }
+            }
           }
+          if (!canPlace) break;
         }
+        if (canPlace) return true;
       }
     }
   }
-  return false; // No move for any piece in hand
+  return false;
 }
 
-export function clearCompletedLines(board: Board): { newBoard: Board; clearedRows: number[]; clearedCols: number[] } {
+/**
+ * Returns new board and what was cleared
+ * @param {Board} board
+ */
+export function clearCompletedLines(board: Board) {
   const size = board.length;
   const clearedRows: number[] = [];
   const clearedCols: number[] = [];
-  // Find completed rows
   for (let r = 0; r < size; r++) {
     if (board[r].every(cell => cell === 1)) clearedRows.push(r);
   }
-  // Find completed columns
   for (let c = 0; c < size; c++) {
     if (board.every(row => row[c] === 1)) clearedCols.push(c);
   }
-  // Clear
   const newBoard = board.map((row, i) =>
     row.map((cell, j) =>
       clearedRows.includes(i) || clearedCols.includes(j) ? 0 : cell
