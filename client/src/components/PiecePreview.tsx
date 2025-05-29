@@ -1,28 +1,25 @@
 import React from "react";
 import Box from "@mui/material/Box";
-import { Piece } from "../types/piece";
+import { PlayerPiece } from "../types/piece";
 
 interface PiecePreviewProps {
-  piece: Piece;
-  rotation?: number; // index in piece.matrices[]
-  size?: number;     // px for each cell
+  piece: PlayerPiece;
+  size?: number;
   onClick?: () => void;
   selected?: boolean;
-  disabled?: boolean; // NEW PROP
+  disabled?: boolean;
 }
 
 const defaultCellSize = 24;
 
 const PiecePreview: React.FC<PiecePreviewProps> = ({
                                                      piece,
-                                                     rotation = 0,
                                                      size = defaultCellSize,
                                                      onClick,
                                                      selected = false,
                                                      disabled = false,
                                                    }) => {
-  const matrix = piece.matrices[rotation % piece.matrices.length];
-
+  const matrix = piece.matrix;
   return (
     <Box
       sx={{
@@ -31,12 +28,11 @@ const PiecePreview: React.FC<PiecePreviewProps> = ({
         borderRadius: 2,
         p: 0.5,
         border: selected ? "2px solid #E09F3E" : "2px solid transparent",
-        cursor: disabled ? "not-allowed" : onClick ? "pointer" : "default",
+        cursor: onClick && !disabled ? "pointer" : "default",
         opacity: disabled ? 0.4 : 1,
-        transition: "border 0.2s, opacity 0.2s",
-        pointerEvents: disabled ? "none" : undefined,
+        transition: "border 0.2s",
       }}
-      onClick={!disabled ? onClick : undefined}
+      onClick={disabled ? undefined : onClick}
     >
       {matrix.map((row, rIdx) => (
         <Box key={rIdx} sx={{ display: "flex" }}>

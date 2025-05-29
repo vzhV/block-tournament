@@ -1,8 +1,16 @@
-export type PieceMatrix = number[][];
+// types/piece.ts
 
 export interface Piece {
-  id: string; // Unique ID
+  id: string;
   name: string;
   color: string;
-  matrices: PieceMatrix[]; // All possible rotations for this shape
+  matrices: number[][][]; // Only for PIECES palette, not in-hand
+}
+
+// Only for pieces in player hands (from server)
+export interface PlayerPiece {
+  id: string;
+  name: string;
+  color: string;
+  matrix: number[][]; // Only one matrix, not array!
 }

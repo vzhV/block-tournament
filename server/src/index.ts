@@ -67,7 +67,8 @@ io.on("connection", (socket) => {
     socket.emit("game_state", state);
   });
 
-  socket.on("place_piece", async ({ gameId, id, pieceIdx, rotation, row, col, initData }) => {
+  socket.on("place_piece", async ({ gameId, id, pieceIdx, row, col, initData }) => {
+    console.log(`PLACE PIECE: gameId: ${gameId} id: ${id} pieceIdx: ${pieceIdx} row: ${row} col: ${col}`)
     try {
       const botToken = process.env.TELEGRAM_BOT_TOKEN!;
       if (!isValid(initData, botToken)) {
@@ -76,7 +77,7 @@ io.on("connection", (socket) => {
       }
       const telegramUser = parse(initData).user;
       // Optionally: if (id !== String(telegramUser.id)) return error
-      const result = await processPlayerMove(gameId, id, pieceIdx, rotation, row, col);
+      const result = await processPlayerMove(gameId, id, pieceIdx, row, col); // NO rotation!
       if (result.error) {
         socket.emit("error", result.error);
         return;

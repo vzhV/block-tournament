@@ -1,10 +1,10 @@
 import { TelegramUser } from "./telegram";
+import {PlayerPiece} from "./piece.ts";
 
 export interface PlayerInfo extends TelegramUser {
   socketId: string;
   hp: number;
-  board: number[][];
-  pieces: any[]; // Use your real Piece type if possible
+  pieces: PlayerPiece[]; // Use your real Piece type if possible
   connected: boolean;
 }
 
