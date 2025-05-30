@@ -32,3 +32,14 @@ export function getInitData() {
   // @ts-ignore
   return window.Telegram.WebApp.initData || "";
 }
+
+export function getStartParam(): string | null {
+  // Get the raw initData string
+  // @ts-ignore
+  const initData = window.Telegram?.WebApp?.initData || "";
+  if (!initData) return null;
+
+  const params = new URLSearchParams(initData);
+  const startParam = params.get("start_param");
+  return startParam && startParam.length > 0 ? startParam : null;
+}

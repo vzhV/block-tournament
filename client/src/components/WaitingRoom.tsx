@@ -3,13 +3,8 @@ import { Box, Typography, Avatar, Stack, CircularProgress, Alert, Button, Toolti
 import { getTelegramUser } from "../utils/telegram";
 import { socket } from "../utils/socket";
 
-type PlayerInfo = {
-  id: string;
-  username?: string;
-  photo_url?: string;
-  first_name?: string;
-  last_name?: string;
-};
+// CHANGE this to your actual bot username
+const BOT_USERNAME = "block_tournament_bot";
 
 const colors = {
   background: "#190332",
@@ -22,6 +17,14 @@ const colors = {
   glow: "0 0 8px 1px rgba(143,75,232,0.22)"
 };
 
+type PlayerInfo = {
+  id: string;
+  username?: string;
+  photo_url?: string;
+  first_name?: string;
+  last_name?: string;
+};
+
 const WaitingRoom: React.FC<{
   gameId: string;
   lobbyCode?: string | null;
@@ -30,6 +33,8 @@ const WaitingRoom: React.FC<{
   const [error, setError] = useState<string | null>(null);
   const user = getTelegramUser();
   const [copied, setCopied] = useState(false);
+  const [inviteCopied, setInviteCopied] = useState(false);
+  const [shareResult, setShareResult] = useState<string | null>(null);
 
   useEffect(() => {
     setError(null);
@@ -67,6 +72,42 @@ const WaitingRoom: React.FC<{
       setCopied(true);
       setTimeout(() => setCopied(false), 1000);
     }
+  }
+
+  // Invite link: https://t.me/BOT_USERNAME?startapp=LOBBYCODE
+  const inviteLink = lobbyCode
+    ? `https://t.me/${BOT_USERNAME}?startapp=${lobbyCode}`
+    : "";
+
+  function handleCopyInvite() {
+    if (inviteLink) {
+      navigator.clipboard.writeText(inviteLink);
+      setInviteCopied(true);
+      setTimeout(() => setInviteCopied(false), 1200);
+    }
+  }
+
+  // Universal Telegram share link (works everywhere)
+  const shareText = encodeURIComponent("👾 Join my Block Tournament! Tap to join my lobby:");
+  const shareUrl = encodeURIComponent(inviteLink);
+  const telegramShareUrl = `https://t.me/share/url?url=${shareUrl}&text=${shareText}`;
+
+  // Try native WebApp share dialog, fallback to Telegram universal share
+  function handleShareTelegram(e?: React.MouseEvent) {
+    // @ts-ignore
+    if (window.Telegram?.WebApp?.showShareDialog && inviteLink) {
+      // @ts-ignore
+      window.Telegram.WebApp.showShareDialog({
+        message: `👾 Join my Block Tournament! Tap to join the lobby:`,
+        url: inviteLink
+      }, (res: any) => {
+        setShareResult(res?.status === 'sent' ? "Invite sent!" : "Invite cancelled");
+        setTimeout(() => setShareResult(null), 1500);
+      });
+      // prevent link click
+      if (e) e.preventDefault();
+    }
+    // else fallback to opening share link in new tab (handled below)
   }
 
   return (
@@ -108,29 +149,47 @@ const WaitingRoom: React.FC<{
           Waiting Room
         </Typography>
         {lobbyCode ? (
-          <Stack alignItems="center" mb={3}>
+          <Box
+            sx={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              background: 'linear-gradient(100deg, #24154b 60%, #4b267b 100%)',
+              borderRadius: 3,
+              boxShadow: '0 2px 32px 0 #a259ff26',
+              border: `2px solid ${colors.accent}`,
+              py: 2,
+              px: 2.5,
+              mt: 1.5,
+              mb: 2
+            }}
+          >
             <Typography
-              align="center"
-              sx={{ color: colors.white, mb: 0.5, opacity: 0.92 }}
+              sx={{
+                fontWeight: 700,
+                fontSize: 18,
+                letterSpacing: 1.1,
+                color: colors.accent,
+                mb: 0.7
+              }}
             >
-              Share this code to invite a friend:
+              Invite your friend!
             </Typography>
             <Box
               sx={{
                 fontWeight: 700,
-                fontSize: 24,
-                bgcolor: "rgba(80,30,130,0.18)",
-                color: colors.accent,
-                px: 2,
-                py: 0.5,
-                letterSpacing: "0.15em",
+                fontSize: 25,
+                bgcolor: 'rgba(80,30,130,0.22)',
+                color: colors.white,
+                px: 2.5,
+                py: 1,
+                letterSpacing: "0.19em",
                 borderRadius: 2,
                 display: "inline-flex",
                 alignItems: "center",
                 boxShadow: colors.glow,
-                mt: 0.5,
-                mb: 1,
-                userSelect: "all"
+                userSelect: "all",
+                mb: 1
               }}
             >
               {lobbyCode}
@@ -153,7 +212,64 @@ const WaitingRoom: React.FC<{
                 </Button>
               </Tooltip>
             </Box>
-          </Stack>
+
+            <Stack direction="row" spacing={1} sx={{ mt: 1, mb: 1.3 }}>
+              <Button
+                variant="outlined"
+                onClick={handleCopyInvite}
+                sx={{
+                  color: colors.accent,
+                  borderColor: colors.accent,
+                  borderRadius: 2,
+                  fontWeight: 600,
+                  px: 2,
+                  py: 1,
+                  '&:hover': { background: colors.accentAlt, color: colors.white }
+                }}
+                size="small"
+              >
+                Copy Invite Link
+              </Button>
+              {/* Universal share link, but try showShareDialog first if available */}
+              <a
+                href={telegramShareUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ textDecoration: "none" }}
+                onClick={handleShareTelegram}
+              >
+                <Button
+                  variant="contained"
+                  sx={{
+                    background: colors.accent,
+                    color: colors.white,
+                    fontWeight: 700,
+                    borderRadius: 2,
+                    px: 2.5,
+                    py: 1.1,
+                    boxShadow: colors.glow,
+                    letterSpacing: 0.3,
+                    '&:hover': { background: colors.accentAlt, color: "#fff" },
+                    transition: "background 0.18s"
+                  }}
+                  size="small"
+                  startIcon={<span style={{fontSize: 20}}>✈️</span>}
+                >
+                  Share in Telegram
+                </Button>
+              </a>
+            </Stack>
+            {inviteCopied && (
+              <Typography sx={{ color: colors.accent, fontWeight: 700, fontSize: 14, mt: 0.4 }}>
+                Invite link copied!
+              </Typography>
+            )}
+            {shareResult && (
+              <Typography sx={{ color: colors.accent, fontWeight: 700, fontSize: 14, mt: 0.4 }}>
+                {shareResult}
+              </Typography>
+            )}
+          </Box>
         ) : (
           <Typography
             align="center"

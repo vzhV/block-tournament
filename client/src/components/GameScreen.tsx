@@ -56,6 +56,18 @@ const colors = {
 };
 
 
+function triggerHapticBlast() {
+  // Telegram Web App API (works only inside Telegram)
+  // @ts-ignore
+  if (window?.Telegram?.WebApp?.HapticFeedback) {
+    // @ts-ignore
+    window.Telegram.WebApp.HapticFeedback.impactOccurred('soft');
+  }
+  // Fallback: Native browser vibration (if available)
+  else if ('vibrate' in window.navigator) {
+    window.navigator.vibrate(100);
+  }
+}
 
 const ResultModal: React.FC<{
   open: boolean;
@@ -281,6 +293,12 @@ const GameScreen: React.FC<{
     };
     // eslint-disable-next-line
   }, [gameId]);
+
+  useEffect(() => {
+    if (feedbackStage === "blow") {
+      triggerHapticBlast()
+    }
+  }, [feedbackStage]);
 
   useEffect(() => {
     if (gameState?.notification) setNotification(gameState.notification);
@@ -800,8 +818,8 @@ const GameScreen: React.FC<{
                 display: "flex",
                 justifyContent: "center",
                 alignItems: "center",
-                margin: "0 auto",
                 background: "rgba(60,20,80,0.86)",
+                marginRight: '16px',
                 borderRadius: 2,
                 boxShadow: "0 2px 40px 0 rgba(143,75,232,0.11)"
               }}
