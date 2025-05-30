@@ -40,3 +40,14 @@ export interface GameState {
   winner?: 0 | 1 | null;
   notification: string | null;
 }
+
+export interface MoveFeedback {
+  oldBoard: Board;
+  placed: { matrix: number[][]; row: number; col: number; color: string };
+  clearedRows: number[];
+  clearedCols: number[];
+  clearBoard: boolean;
+  noMoves: boolean;
+  clearedPlayerIdx?: 0 | 1;
+}
+
