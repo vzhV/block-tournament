@@ -1,4 +1,4 @@
-import React from "react";
+import React, {useEffect, useState} from "react";
 import { Board } from "../types/board";
 import { motion } from "framer-motion";
 import PiecePreview from "./PiecePreview";
@@ -60,6 +60,37 @@ const GameBoard: React.FC<GameBoardProps> = ({
     grid[0].length > 0;
   const nRows = gridValid ? grid.length : DEFAULT_SIZE;
   const nCols = gridValid ? grid[0].length : DEFAULT_SIZE;
+  const [lastHapticCell, setLastHapticCell] = useState<{row: number, col: number} | null>(null);
+
+  useEffect(() => {
+    if (
+      draggingPiece &&
+      previewPiece &&
+      previewPiece.canPlace
+    ) {
+      // Vibrate if we moved to a new cell
+      if (
+        !lastHapticCell ||
+        lastHapticCell.row !== previewPiece.row ||
+        lastHapticCell.col !== previewPiece.col
+      ) {
+        // Haptic feedback
+        // @ts-ignore
+        if (window?.Telegram?.WebApp?.HapticFeedback) {
+          // @ts-ignore
+          window.Telegram.WebApp.HapticFeedback.selectionChanged();
+        } else if (navigator.vibrate) {
+          navigator.vibrate(10); // Soft short
+        }
+        setLastHapticCell({row: previewPiece.row, col: previewPiece.col});
+      }
+    }
+    // If not valid anymore, reset last haptic cell
+    if (!draggingPiece || !previewPiece?.canPlace) {
+      setLastHapticCell(null);
+    }
+  }, [previewPiece?.row, previewPiece?.col, previewPiece?.canPlace, draggingPiece]);
+
 
   function isPlacedCell(rowIdx: number, colIdx: number): boolean {
     if (!highlights?.placed) return false;
